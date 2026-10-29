@@ -3,6 +3,7 @@ import sys
 from app.db import get_connection
 from app.llm import analyze_error
 from app.parser import parse_log_line
+from app.review import review_analysis
 
 
 def load_logs(file_path):
@@ -129,8 +130,44 @@ def analyze_errors():
                 print(f"Endpoint: {endpoint}")
                 print(f"Status: {status_code}")
                 print(f"Error count: {error_count}")
-                print(f"Root cause: {result['root_cause']}")
-                print(f"Draft reply: {result['draft_reply']}")
+
+                reviewed = review_analysis(
+                    result["root_cause"],
+                    result["draft_reply"],
+                )
+
+                if reviewed["review_status"] == "rejected":
+                    print("Analysis rejected. Nothing was saved.")
+                    continue
+
+                cursor.execute(
+                    """
+                    INSERT INTO analyses (
+                        endpoint,
+                        status_code,
+                        error_count,
+                        root_cause,
+                        draft_reply,
+                        review_status
+                    )
+                    VALUES (%s, %s, %s, %s, %s, %s)
+                    """,
+                    (
+                        endpoint,
+                        status_code,
+                        error_count,
+                        reviewed["root_cause"],
+                        reviewed["draft_reply"],
+                        reviewed["review_status"],
+                    ),
+                )
+
+                conn.commit()
+
+                print(
+                    f"Analysis {reviewed['review_status']} "
+                    "and saved successfully."
+                )
 
     finally:
         conn.close()
