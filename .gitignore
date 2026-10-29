@@ -3,3 +3,4 @@ venv/
 __pycache__/
 .pytest_cache/
 *.pyc
+sample_logs/api_logs.txt
