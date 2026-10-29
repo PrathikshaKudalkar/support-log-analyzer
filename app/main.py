@@ -1,6 +1,7 @@
 import sys
 
 from app.db import get_connection
+from app.llm import analyze_error
 from app.parser import parse_log_line
 
 
@@ -81,9 +82,66 @@ def show_summary():
         conn.close()
 
 
+def analyze_errors():
+    conn = get_connection()
+
+    try:
+        with conn.cursor() as cursor:
+            cursor.execute(
+                """
+                SELECT
+                    endpoint,
+                    status_code,
+                    COUNT(*) AS error_count
+                FROM api_logs
+                WHERE status_code >= 500
+                GROUP BY endpoint, status_code
+                ORDER BY error_count DESC
+                LIMIT 3;
+                """
+            )
+
+            groups = cursor.fetchall()
+
+            for endpoint, status_code, error_count in groups:
+                cursor.execute(
+                    """
+                    SELECT message
+                    FROM api_logs
+                    WHERE endpoint = %s
+                      AND status_code = %s
+                    ORDER BY logged_at DESC
+                    LIMIT 5;
+                    """,
+                    (endpoint, status_code),
+                )
+
+                messages = [row[0] for row in cursor.fetchall()]
+
+                result = analyze_error(
+                    endpoint,
+                    status_code,
+                    error_count,
+                    messages,
+                )
+
+                print("\n" + "=" * 60)
+                print(f"Endpoint: {endpoint}")
+                print(f"Status: {status_code}")
+                print(f"Error count: {error_count}")
+                print(f"Root cause: {result['root_cause']}")
+                print(f"Draft reply: {result['draft_reply']}")
+
+    finally:
+        conn.close()
+
+
 if __name__ == "__main__":
     if len(sys.argv) < 2:
-        print("Usage: python -m app.main load <file> OR python -m app.main summary")
+        print(
+            "Usage: python -m app.main "
+            "load <file> OR summary OR analyze"
+        )
         sys.exit(1)
 
     command = sys.argv[1]
@@ -97,6 +155,9 @@ if __name__ == "__main__":
 
     elif command == "summary":
         show_summary()
+
+    elif command == "analyze":
+        analyze_errors()
 
     else:
         print(f"Unknown command: {command}")
