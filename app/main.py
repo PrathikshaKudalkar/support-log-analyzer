@@ -173,11 +173,54 @@ def analyze_errors():
         conn.close()
 
 
+def show_reports():
+    conn = get_connection()
+
+    try:
+        with conn.cursor() as cursor:
+            cursor.execute(
+                """
+                SELECT
+                    endpoint,
+                    status_code,
+                    error_count,
+                    root_cause,
+                    draft_reply,
+                    review_status
+                FROM analyses
+                ORDER BY id;
+                """
+            )
+
+            rows = cursor.fetchall()
+
+            print("\nReviewed Analysis Reports")
+            print("-" * 70)
+
+            for (
+                endpoint,
+                status_code,
+                error_count,
+                root_cause,
+                draft_reply,
+                review_status,
+            ) in rows:
+                print(f"\nEndpoint: {endpoint}")
+                print(f"Status Code: {status_code}")
+                print(f"Error Count: {error_count}")
+                print(f"Review Status: {review_status}")
+                print(f"Root Cause: {root_cause}")
+                print(f"Customer Reply: {draft_reply}")
+
+    finally:
+        conn.close()
+
+
 if __name__ == "__main__":
     if len(sys.argv) < 2:
         print(
             "Usage: python -m app.main "
-            "load <file> OR summary OR analyze"
+            "load <file> OR summary OR analyze OR report"
         )
         sys.exit(1)
 
@@ -195,6 +238,9 @@ if __name__ == "__main__":
 
     elif command == "analyze":
         analyze_errors()
+
+    elif command == "report":
+        show_reports()
 
     else:
         print(f"Unknown command: {command}")
