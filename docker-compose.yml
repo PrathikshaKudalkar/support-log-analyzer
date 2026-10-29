@@ -12,5 +12,19 @@ services:
       - postgres_data:/var/lib/postgresql/data
       - ./sql/schema.sql:/docker-entrypoint-initdb.d/schema.sql
 
+  app:
+    build: .
+    container_name: support_log_app
+    environment:
+      DB_HOST: db
+      DB_PORT: 5432
+      DB_NAME: support_logs
+      DB_USER: support_user
+      DB_PASSWORD: support_password
+      LLM_MOCK_MODE: "true"
+    depends_on:
+      - db
+    command: ["python", "-m", "app.main", "summary"]
+
 volumes:
   postgres_data:
